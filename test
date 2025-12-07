@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Klantenservice Dashboard</title>
+    <style>
+        /* --- Basis Stijl (Hetzelfde als voorheen) --- */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Veranderd naar flex-start voor scrollen bij meer content */
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .interface-container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 600px; /* Iets breder gemaakt voor de kaart */
+        }
+
+        h2, h3 { color: #333; margin-top: 0; }
+        
+        label { font-weight: bold; display: block; margin-bottom: 8px; color: #555; }
+        
+        textarea {
+            width: 100%; height: 100px; padding: 12px; margin-bottom: 20px;
+            border: 1px solid #ccc; border-radius: 6px; resize: vertical;
+            font-family: inherit;
+        }
+
+        /* --- Grid voor de 4 actieknoppen --- */
+        .button-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 30px;
+        }
+
+        .action-btn {
+            background-color: #007bff; color: white; border: none; padding: 12px;
+            border-radius: 6px; font-weight: 600; cursor: pointer;
+        }
+        .action-btn:hover { background-color: #0056b3; }
+        .btn-cancel { background-color: #dc3545; }
+        .btn-discount { background-color: #28a745; }
+
+        /* --- Nieuwe Stijl voor de Bouwmarkt Zoeker --- */
+        .store-locator {
+            border-top: 2px solid #eee;
+            padding-top: 20px;
+        }
+
+        .search-box {
+            display: flex; gap: 10px; margin-bottom: 15px;
+        }
+
+        .search-box input {
+            flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 6px;
+        }
+
+        .search-box button {
+            padding: 10px 20px; background-color: #ff9900; /* Gamma/Karwei achtig oranje */
+            color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;
+        }
+        .search-box button:hover { background-color: #e68a00; }
+
+        /* Resultaten weergave */
+        #resultaten-lijst {
+            margin-bottom: 15px;
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 6px;
+            display: none; /* Standaard verborgen */
+        }
+
+        .store-item {
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #ddd;
+        }
+        .store-item:last-child { border-bottom: none; }
+        .store-name { font-weight: bold; color: #333; }
+        .store-phone { color: #007bff; }
+
+        /* De Google Maps Iframe */
+        .map-frame {
+            width: 100%;
+            height: 300px;
+            border: 0;
+            border-radius: 6px;
+            background-color: #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="interface-container">
+        <h2>Klantvraag Verwerking</h2>
+        
+        <label for="klantvraag">Vraag van de klant:</label>
+        <textarea id="klantvraag" placeholder="Typ hier de vraag..."></textarea>
+
+        <div class="button-grid">
+            <button class="action-btn">Status levering</button>
+            <button class="action-btn">Wijziging levering</button>
+            <button class="action-btn btn-cancel">Annulering order</button>
+            <button class="action-btn btn-discount">Korting/punten</button>
+        </div>
+
+        <div class="store-locator">
+            <h3>📍 Bouwmarkt Zoeker (Gamma/Karwei)</h3>
+            <p style="font-size: 0.9em; color: #666;">Zoek op stad voor dichtstbijzijnde locaties.</p>
+            
+            <div class="search-box">
+                <input type="text" id="stadInput" placeholder="Bijv. Amsterdam, Rotterdam..." value="">
+                <button onclick="zoekBouwmarkt()">Zoek</button>
+            </div>
+
+            <div id="resultaten-lijst"></div>
+
+            <iframe 
+                id="googleMap"
+                class="map-frame"
+                src="https://maps.google.com/maps?q=Gamma+Karwei+Nederland&t=&z=7&ie=UTF8&iwloc=&output=embed"
+                allowfullscreen>
+            </iframe>
+        </div>
+    </div>
+
+    <script>
+        // --- SIMULATIE DATA ---
+        // Omdat we geen echte betaalde Google API Key hebben, gebruiken we hier een lijstje
+        // met voorbeeldgegevens. In een echte app zou dit uit een database komen.
+        const database = {
+            "amsterdam": [
+                { naam: "Gamma Amsterdam-West", tel: "020-1234567" },
+                { naam: "Karwei Amsterdam-Noord", tel: "020-7654321" },
+                { naam: "Gamma Amsterdam-Zuid", tel: "020-9988776" }
+            ],
+            "rotterdam": [
+                { naam: "Gamma Rotterdam-Centrum", tel: "010-1122334" },
+                { naam: "Karwei Rotterdam-Zuid", tel: "010-4455667" }
+            ],
+            "utrecht": [
+                { naam: "Gamma Utrecht", tel: "030-1234567" },
+                { naam: "Karwei Utrecht-Lage Weide", tel: "030-9876543" }
+            ],
+            "hilversum": [
+                 { naam: "Gamma Hilversum", tel: "035-6851234" },
+                 { naam: "Karwei Hilversum", tel: "035-6834567" }
+            ]
+        };
+
+        function zoekBouwmarkt() {
+            // 1. Haal de ingevoerde stad op
+            var stad = document.getElementById('stadInput').value.trim();
+            
+            if(!stad) {
+                alert("Vul aub een stad in.");
+                return;
+            }
+
+            // 2. Update de Google Maps kaart (Dit werkt ECHT, via de embed truc)
+            // We zoeken op: Gamma + Karwei + Stad
+            var mapUrl = "https://maps.google.com/maps?q=Gamma+Karwei+" + stad + "&t=&z=13&ie=UTF8&iwloc=&output=embed";
+            document.getElementById('googleMap').src = mapUrl;
+
+            // 3. Update de tekstresultaten (uit onze 'database')
+            var stadKey = stad.toLowerCase();
+            var resultatenDiv = document.getElementById('resultaten-lijst');
+            resultatenDiv.style.display = 'block';
+            resultatenDiv.innerHTML = ""; // Leegmaken
+
+            if (database[stadKey]) {
+                // We hebben data voor deze stad!
+                var html = "<strong>Gevonden vestigingen in " + stad + ":</strong><br><br>";
+                
+                database[stadKey].forEach(function(winkel) {
+                    html += `
+                        <div class="store-item">
+                            <div class="store-name">${winkel.naam}</div>
+                            <div>📞 <span class="store-phone">${winkel.tel}</span></div>
+                        </div>
+                    `;
+                });
+                resultatenDiv.innerHTML = html;
+            } else {
+                // Geen data in onze simulatie, maar de kaart werkt wel
+                resultatenDiv.innerHTML = `
+                    <div style="color: #d9534f;">
+                        <strong>Let op:</strong> Geen telefoonnummers in de demo-database voor '${stad}'.<br>
+                        De locaties worden wel op de kaart hieronder getoond.
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
